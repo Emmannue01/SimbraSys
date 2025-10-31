@@ -1,15 +1,116 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Lock, Package } from 'lucide-react';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { auth, db } from './firebase.jsx'; 
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Aquí iría la lógica de autenticación
-    console.log('Login attempt:', { email, password, rememberMe });
+    setIsLoading(true);
+    setError(null);
+
+
+    console.log('Intentando iniciar sesión con:', { email, password });
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      console.log('Autenticación exitosa, verificando autorización...', user.email);
+
+      // Paso 2: Verificar si el usuario está en la colección 'autenticados'
+      const docRef = doc(db, "autenticados", user.email);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        // El usuario está autorizado
+        console.log('Usuario autorizado. Redirigiendo...');
+        navigate('/pagina-principal');
+      } else {
+        // El usuario no está en 'autenticados', es un cliente.
+        // Lo registramos en la colección 'clientes' si no existe.
+        const clienteDocRef = doc(db, "clientes", user.uid);
+        const clienteDocSnap = await getDoc(clienteDocRef);
+        if (!clienteDocSnap.exists()) {
+            await setDoc(clienteDocRef, {
+                email: user.email,
+                displayName: user.displayName || '',
+                createdAt: serverTimestamp() 
+            });
+            console.log('Nuevo cliente registrado:', user.email);
+        }
+        console.log('Usuario es un cliente. Redirigiendo a /clientes...');
+        navigate('/clientes');
+      }
+    } catch (err) {
+      console.error("Error de Firebase:", err);
+      switch (err.code) {
+        case 'auth/user-not-found':
+        case 'auth/invalid-credential':
+          setError('Las credenciales son incorrectas. Verifica el correo y la contraseña.');
+          break;
+        case 'auth/wrong-password':
+          setError('La contraseña es incorrecta.');
+          break;
+        case 'auth/invalid-email':
+          setError('El formato del correo electrónico no es válido.');
+          break;
+        default:
+          setError('Hubo un problema al iniciar sesión. Revisa la consola para más detalles.');
+          break;
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setError(null);
+    const provider = new GoogleAuthProvider();
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      console.log('Autenticación con Google exitosa, verificando autorización...', user.email);
+
+      // Paso 2: Verificar si el usuario está en la colección 'autenticados'
+      const docRef = doc(db, "autenticados", user.email);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        console.log('Usuario de Google autorizado. Redirigiendo...');
+        navigate('/pagina-principal');
+      } else {
+        // El usuario no está en 'autenticados', es un cliente.
+        // Lo registramos en la colección 'clientes' si no existe.
+        const clienteDocRef = doc(db, "clientes", user.uid);
+        const clienteDocSnap = await getDoc(clienteDocRef);
+        if (!clienteDocSnap.exists()) {
+            await setDoc(clienteDocRef, {
+                email: user.email,
+                displayName: user.displayName || '',
+                createdAt: serverTimestamp() 
+            });
+            console.log('Nuevo cliente registrado:', user.email);
+        }
+        console.log('Usuario es un cliente. Redirigiendo a /clientes...');
+        navigate('/clientes');
+      }
+    } catch (error) {
+      console.error("Error en inicio de sesión con Google:", error);
+      setError("No se pudo iniciar sesión con Google. Inténtalo de nuevo.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -23,7 +124,7 @@ export default function LoginForm() {
           <p className="text-gray-600 mt-2">Sistema de renta de madera para cimbra</p>
         </div>
 
-        <div className="space-y-6">
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Correo electrónico
@@ -84,22 +185,28 @@ export default function LoginForm() {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-amber-600 hover:text-amber-500">
+              <Link to="/recuperar-contrasena" className="font-medium text-amber-600 hover:text-amber-500">
                 ¿Olvidaste tu contraseña?
-              </a>
+              </Link>
             </div>
           </div>
 
+          {error && (
+            <div className="text-red-600 text-sm text-center">
+              {error}
+            </div>
+          )}
+
           <div>
             <button
-              type="button"
-              onClick={handleSubmit}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition duration-150"
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition duration-150 disabled:bg-amber-400 disabled:cursor-not-allowed"
             >
-              Iniciar sesión
+              {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </button>
           </div>
-        </div>
+        </form>
 
         <div className="mt-6">
           <div className="relative">
@@ -113,8 +220,10 @@ export default function LoginForm() {
 
           <div className="mt-6 grid grid-cols-1 gap-3">
             <div>
-              <a
-                href="#"
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
                 className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition duration-150"
               >
                 <div className="flex items-center">
@@ -125,7 +234,7 @@ export default function LoginForm() {
                   />
                   <span className="ml-2">Google</span>
                 </div>
-              </a>
+              </button>
             </div>
           </div>
         </div>
@@ -133,9 +242,9 @@ export default function LoginForm() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             ¿No tienes una cuenta?{' '}
-            <a href="#" className="font-medium text-amber-600 hover:text-amber-500">
+            <Link to="/registro" className="font-medium text-amber-600 hover:text-amber-500">
               Regístrate
-            </a>
+            </Link>
           </p>
         </div>
       </div>
