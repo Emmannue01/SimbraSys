@@ -1,4 +1,4 @@
-// src/components/ClientesPage.jsx
+
 
 import React from 'react';
 // Línea 4
@@ -11,7 +11,7 @@ import ClientsView from './pages/ClientsView.jsx'; // Añadir la extensión .jsx
 export default function ClientesPage() {
     const navigate = useNavigate();
     // Usamos un hook de Firebase para obtener el usuario de forma reactiva (si lo tienes)
-    // Por ahora, usamos auth.currentUser, que funciona después de la carga inicial
+    
     const user = auth.currentUser; 
 
     const handleLogout = async () => {
