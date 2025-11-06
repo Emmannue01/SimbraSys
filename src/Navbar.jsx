@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Package, LogOut, LayoutGrid, FileText, RotateCw, BarChart2, Users, Menu, X } from 'lucide-react';
+import { Package, LogOut, LayoutGrid, FileText, RotateCw, BarChart2, Users, Menu, X, Home } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import { auth } from './components/firebase';
 
 const navLinks = [
-  { to: "/pagina-principal", text: "Inventario", icon: LayoutGrid },
+  { to: "/dashboard", text: "Inicio", icon: Home },
+  { to: "/inventario", text: "Inventario", icon: LayoutGrid },
   { to: "/clientes", text: "Clientes", icon: Users },
   { to: "/contratos", text: "Contratos", icon: FileText },
   { to: "/devoluciones", text: "Devoluciones", icon: RotateCw },
@@ -38,7 +39,7 @@ export default function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-3">
           {/* Logo y Título */}
-          <NavLink to="/pagina-principal" className="flex items-center gap-3">
+          <NavLink to="/dashboard" className="flex items-center gap-3">
             <Package className="h-8 w-8 text-white" />
             <h1 className="text-xl font-bold text-white hidden sm:block">CIMBRA-SYS</h1>
           </NavLink>

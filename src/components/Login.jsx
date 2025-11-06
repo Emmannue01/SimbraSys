@@ -33,7 +33,7 @@ export default function LoginForm() {
       if (docSnap.exists()) {
         // El usuario está autorizado
         console.log('Usuario autorizado. Redirigiendo...');
-        navigate('/pagina-principal');
+        navigate('/dashboard');
       } else {
         // El usuario no está en 'autenticados'. No está autorizado.
         console.log('Usuario no autorizado:', user.email);
@@ -78,7 +78,7 @@ export default function LoginForm() {
 
       if (docSnap.exists()) {
         console.log('Usuario de Google autorizado. Redirigiendo...');
-        navigate('/pagina-principal');
+        navigate('/dashboard');
       } else {
         // El usuario no está en 'autenticados'. No está autorizado.
         console.log('Usuario de Google no autorizado:', user.email);

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Users, Search, Save, X, Edit2, Trash2 } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from "firebase/firestore";
 
-export default function ClientManagement() {
+export default function ClientesPage() {
   const [clients, setClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -12,47 +16,48 @@ export default function ClientManagement() {
     project: ''
   });
 
+  const clientsCollectionRef = collection(db, "clients");
+
   useEffect(() => {
-    loadClients();
+    fetchClients();
   }, []);
 
-  const loadClients = async () => {
+  const fetchClients = async () => {
+    setIsLoading(true);
     try {
-      const result = await window.storage.list('client:');
-      if (result && result.keys) {
-        const clientsData = await Promise.all(
-          result.keys.map(async (key) => {
-            const data = await window.storage.get(key);
-            return data ? { id: key, ...JSON.parse(data.value) } : null;
-          })
-        );
-        setClients(clientsData.filter(c => c !== null));
-      }
+      const q = query(clientsCollectionRef, orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const clientsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setClients(clientsData);
     } catch (error) {
-      console.log('No hay clientes guardados aún');
+      console.error("Error al cargar los clientes: ", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.phone || !formData.project) {
       alert('Por favor complete los campos obligatorios');
       return;
     }
 
     try {
-      const clientId = editingId || `client:${Date.now()}`;
-      const clientData = {
-        name: formData.name,
-        phone: formData.phone,
-        address: formData.address,
-        project: formData.project,
-        createdAt: editingId ? clients.find(c => c.id === clientId)?.createdAt : new Date().toISOString()
-      };
-
-      await window.storage.set(clientId, JSON.stringify(clientData));
-      await loadClients();
+      if (editingId) {
+        const clientDoc = doc(db, "clients", editingId);
+        await updateDoc(clientDoc, formData);
+      } else {
+        await addDoc(clientsCollectionRef, {
+          ...formData,
+          createdAt: serverTimestamp()
+        });
+      }
+      fetchClients();
       handleCancel();
     } catch (error) {
       console.error('Error al guardar cliente:', error);
@@ -61,20 +66,18 @@ export default function ClientManagement() {
   };
 
   const handleEdit = (client) => {
-    setFormData({
-      name: client.name,
-      phone: client.phone,
-      address: client.address || '',
-      project: client.project
-    });
+    // Asegurarse de que todos los campos del formulario estén definidos
+    const { name = '', phone = '', address = '', project = '' } = client;
+    setFormData({ name, phone, address, project });
     setEditingId(client.id);
   };
 
   const handleDelete = async (id) => {
-    if (confirm('¿Está seguro de eliminar este cliente?')) {
+    if (window.confirm('¿Está seguro de eliminar este cliente?')) {
       try {
-        await window.storage.delete(id);
-        await loadClients();
+        const clientDoc = doc(db, "clients", id);
+        await deleteDoc(clientDoc);
+        fetchClients();
       } catch (error) {
         console.error('Error al eliminar cliente:', error);
       }
@@ -245,13 +248,7 @@ export default function ClientManagement() {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <Users className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-lg font-medium text-gray-900">No hay clientes registrados</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {searchTerm ? 'No se encontraron resultados para tu búsqueda.' : 'Empieza agregando nuevos clientes al sistema.'}
-                  </p>
-                </div>
+                <p className="text-gray-500">No se encontraron clientes.</p>
               )}
             </div>
           </section>
