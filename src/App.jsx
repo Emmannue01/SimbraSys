@@ -6,14 +6,15 @@ import { auth } from './components/firebase';
 import LoginForm from './components/Login';
 import RegisterForm from './components/RegisterForm';
 import ForgotPasswordForm from './components/ForgotPasswordForm';
-import ClientesPage from './components/ClientesPage';
+import ClientesPage from './components/pages/ClientesPage';
 import PaginaPrincipal from './components/PaginaPrincipal';
+import ContractsPage from './components/pages/ContractsPage';
 
 function App() {
   const [user, loading] = useAuthState(auth);
 
-  if (loading) return <div>Cargando...</div>;
-
+  if (loading) return <div>Cargando...</div>
+//sss
   return (
     <BrowserRouter>
       <Routes>
@@ -24,7 +25,9 @@ function App() {
         <Route path="/login" element={<LoginForm />} />
         <Route path="/registro" element={user ? <Navigate to="/pagina-principal" /> : <RegisterForm />} />
         <Route path="/recuperar-contrasena" element={user ? <Navigate to="/pagina-principal" /> : <ForgotPasswordForm />} />
+
         <Route path="/clientes" element={user ? <ClientesPage /> : <Navigate to="/login" />} />
+<Route path="/contratos" element={user ? <ContractsPage /> : <Navigate to="/login" />} />
         <Route path="/pagina-principal" element={user ? <PaginaPrincipal /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to={user ? "/pagina-principal" : "/login"} />} />
       </Routes>

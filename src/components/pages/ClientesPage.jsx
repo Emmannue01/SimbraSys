@@ -1,21 +1,23 @@
-// src/components/ContractsPage.jsx
+
 
 import React from 'react';
-import { auth } from './firebase.jsx'; // Usa la ruta corregida
+// Línea 4
+import { auth } from '../firebase.jsx'; // Usa './' y la extensión .jsx
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
-// Importamos la vista principal de Contratoss
-//ssdfsdfs
-import ContractsView from './pages/ContractsView.jsx'; 
+// Importamos el componente de interfaz que acabamos de crear en /pages/
+import ClientsView from './pages/ClientsView.jsx'; // Añadir la extensión .jsx
 
-export default function ContractsPage() {
+export default function ClientesPage() {
     const navigate = useNavigate();
+    // Usamos un hook de Firebase para obtener el usuario de forma reactiva (si lo tienes)
+    
     const user = auth.currentUser; 
 
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            navigate('/login');
+            navigate('/login'); // Redirige al login después de cerrar sesión
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
         }
@@ -26,7 +28,7 @@ export default function ContractsPage() {
             {/* CABECERA (Contiene el Logout) */}
             <header className="p-8 bg-white shadow-md">
                 <div className="flex justify-between items-center max-w-7xl mx-auto">
-                    <h1 className="text-3xl font-bold text-gray-800">Sección de Contratos</h1>
+                    <h1 className="text-3xl font-bold text-gray-800">Sección de Clientes</h1>
                     <div className="flex items-center gap-4">
                         {user ? (
                             <p className="text-gray-600">
@@ -35,7 +37,7 @@ export default function ContractsPage() {
                         ) : (
                             <p className="text-gray-600">Cargando usuario...</p>
                         )}
-                        
+
                         <button 
                             onClick={handleLogout} 
                             className="px-4 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700 transition duration-150"
@@ -47,7 +49,7 @@ export default function ContractsPage() {
             </header>
 
             {/* CONTENIDO DE LA INTERFAZ CONVERTIDA */}
-            <ContractsView /> 
+            <ClientsView /> 
         </div>
     );
 }
