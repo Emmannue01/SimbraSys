@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart2, Download } from 'lucide-react';
-import { Line } from 'recharts';
-import Chart from 'chart.js/auto';
+import { Chart, registerables } from 'chart.js/auto';
 
+Chart.register(...registerables);
 export default function ReportsIncome() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -14,9 +14,15 @@ export default function ReportsIncome() {
 
   useEffect(() => {
     // Inicializar gráfica
+    let chart;
     const ctx = document.getElementById('incomeChart');
-    if (ctx && !chartInstance) {
-      const chart = new Chart(ctx, {
+    if (ctx) {
+      // Destruir cualquier instancia de gráfico existente en este canvas
+      const existingChart = Chart.getChart(ctx);
+      if (existingChart) {
+        existingChart.destroy();
+      }
+      chart = new Chart(ctx, {
         type: 'line',
         data: {
           labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
@@ -49,16 +55,14 @@ export default function ReportsIncome() {
           }
         }
       });
-      setChartInstance(chart);
     }
 
     // Cargar datos de ejemplo
     loadSampleRentals();
 
     return () => {
-      if (chartInstance) {
-        chartInstance.destroy();
-      }
+      // Limpieza al desmontar el componente
+      chart?.destroy();
     };
   }, []);
 

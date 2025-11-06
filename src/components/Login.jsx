@@ -35,20 +35,10 @@ export default function LoginForm() {
         console.log('Usuario autorizado. Redirigiendo...');
         navigate('/pagina-principal');
       } else {
-        // El usuario no está en 'autenticados', es un cliente.
-        // Lo registramos en la colección 'clientes' si no existe.
-        const clienteDocRef = doc(db, "clientes", user.uid);
-        const clienteDocSnap = await getDoc(clienteDocRef);
-        if (!clienteDocSnap.exists()) {
-            await setDoc(clienteDocRef, {
-                email: user.email,
-                displayName: user.displayName || '',
-                createdAt: serverTimestamp() 
-            });
-            console.log('Nuevo cliente registrado:', user.email);
-        }
-        console.log('Usuario es un cliente. Redirigiendo a /clientes...');
-        navigate('/clientes');
+        // El usuario no está en 'autenticados'. No está autorizado.
+        console.log('Usuario no autorizado:', user.email);
+        await signOut(auth); // Cerrar la sesión del usuario no autorizado
+        setError('No tienes permiso para acceder. Contacta a un administrador.');
       }
     } catch (err) {
       console.error("Error de Firebase:", err);
@@ -90,20 +80,10 @@ export default function LoginForm() {
         console.log('Usuario de Google autorizado. Redirigiendo...');
         navigate('/pagina-principal');
       } else {
-        // El usuario no está en 'autenticados', es un cliente.
-        // Lo registramos en la colección 'clientes' si no existe.
-        const clienteDocRef = doc(db, "clientes", user.uid);
-        const clienteDocSnap = await getDoc(clienteDocRef);
-        if (!clienteDocSnap.exists()) {
-            await setDoc(clienteDocRef, {
-                email: user.email,
-                displayName: user.displayName || '',
-                createdAt: serverTimestamp() 
-            });
-            console.log('Nuevo cliente registrado:', user.email);
-        }
-        console.log('Usuario es un cliente. Redirigiendo a /clientes...');
-        navigate('/clientes');
+        // El usuario no está en 'autenticados'. No está autorizado.
+        console.log('Usuario de Google no autorizado:', user.email);
+        await signOut(auth); // Cerrar la sesión del usuario no autorizado
+        setError('No tienes permiso para acceder. Contacta a un administrador.');
       }
     } catch (error) {
       console.error("Error en inicio de sesión con Google:", error);

@@ -93,16 +93,9 @@ export default function ClientManagement() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-blue-600 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">CimbraSys</h1>
-        </div>
-      </nav>
-
-      <main className="container mx-auto px-4 py-8">
+    <div className="w-full">
         <div className="flex flex-col lg:flex-row gap-8">
-          <section className="w-full lg:w-1/3">
+          <section className="w-full lg:w-1/3 print:hidden">
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                 <UserPlus className="text-blue-600" size={24} />
@@ -263,13 +256,6 @@ export default function ClientManagement() {
             </div>
           </section>
         </div>
-      </main>
-
-      <footer className="bg-gray-800 text-white mt-12">
-        <div className="container mx-auto px-4 py-6 text-center">
-          <p className="text-sm">© 2024 CimbraSys. Todos los derechos reservados.</p>
-        </div>
-      </footer>
     </div>
   );
 }

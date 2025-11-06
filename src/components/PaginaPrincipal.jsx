@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Package, PlusCircle, Save, X, List, Edit2, Trash2, LogOut } from 'lucide-react';
+import { Search, Package, PlusCircle, Save, X, List, Edit2, Trash2 } from 'lucide-react';
 
 export default function InventoryManagement() {
   const [inventory, setInventory] = useState([]);
@@ -14,8 +14,6 @@ export default function InventoryManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
 
-  const user = { displayName: 'Usuario Demo', email: 'demo@cimbrasys.com' };
-
   useEffect(() => {
     const savedInventory = localStorage.getItem('cimbrasys-inventory');
     if (savedInventory) {
@@ -26,10 +24,6 @@ export default function InventoryManagement() {
   useEffect(() => {
     localStorage.setItem('cimbrasys-inventory', JSON.stringify(inventory));
   }, [inventory]);
-
-  const handleLogout = () => {
-    alert('Funcionalidad de cierre de sesión\nIntegrar con:\n\nimport { auth } from "./firebase.jsx";\nimport { signOut } from "firebase/auth";\n\nconst handleLogout = async () => {\n  await signOut(auth);\n  navigate("/login");\n};');
-  };
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -105,37 +99,8 @@ export default function InventoryManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-md">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <Package className="text-blue-600" size={32} />
-              <h1 className="text-2xl font-bold text-gray-800">CimbraSys</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              {user && (
-                <div className="text-right">
-                  <p className="text-sm text-gray-600">Bienvenido</p>
-                  <p className="font-semibold text-gray-800">
-                    {user.displayName || user.email}
-                  </p>
-                </div>
-              )}
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
-              >
-                <LogOut size={18} />
-                Cerrar Sesión
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+    <div className="w-full">
+        <div className="flex flex-col lg:flex-row gap-8 h-full">
           <section className="w-full lg:w-1/3">
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
@@ -344,13 +309,6 @@ export default function InventoryManagement() {
             </div>
           </section>
         </div>
-      </main>
-
-      <footer className="bg-white shadow-md mt-12">
-        <div className="container mx-auto px-4 py-6 text-center text-gray-600">
-          <p>&copy; 2024 CimbraSys. Todos los derechos reservados.</p>
-        </div>
-      </footer>
     </div>
   );
 }

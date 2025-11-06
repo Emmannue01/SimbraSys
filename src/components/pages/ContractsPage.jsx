@@ -95,17 +95,10 @@ const ContractsRental = () => {
   const contractNumber = 'CIM-2023-001';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-800">CimbraSys | Contratos de Renta</h1>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+    <div className="w-full">
+        <div className="flex flex-col lg:flex-row gap-8 h-full">
           {/* Formulario de Contrato */}
-          <section className="w-full lg:w-1/2">
+          <section className="w-full lg:w-1/2 print:hidden">
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                 <FileText className="text-blue-600" size={24} />
@@ -257,7 +250,7 @@ const ContractsRental = () => {
 
           {/* Vista Previa del Contrato */}
           <section className="w-full lg:w-1/2">
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-4">
+            <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                   <Eye className="text-blue-600" size={24} />
@@ -265,13 +258,13 @@ const ContractsRental = () => {
                 </h2>
                 <div className="flex gap-2">
                   <button
-                    onClick={handlePrint}
+                    onClick={handlePrint} title="Imprimir"
                     className="text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-gray-100"
                   >
                     <Printer size={20} />
                   </button>
                   <button
-                    onClick={handleDownload}
+                    onClick={handleDownload} title="Descargar"
                     className="text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-gray-100"
                   >
                     <Download size={20} />
@@ -279,7 +272,7 @@ const ContractsRental = () => {
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded-md p-6 space-y-6">
+              <div id="contract-preview" className="border border-gray-200 rounded-md p-6 space-y-6">
                 <div className="text-center">
                   <h3 className="text-xl font-bold text-gray-800">CONTRATO DE RENTA</h3>
                   <p className="text-sm text-gray-500">CIMBRA-SYS S.A. DE C.V.</p>
@@ -379,13 +372,6 @@ const ContractsRental = () => {
             </div>
           </section>
         </div>
-      </main>
-
-      <footer className="bg-gray-800 text-white mt-12 py-6">
-        <div className="container mx-auto px-4 text-center">
-          <p>&copy; 2023 CimbraSys. Todos los derechos reservados.</p>
-        </div>
-      </footer>
     </div>
   );
 };
