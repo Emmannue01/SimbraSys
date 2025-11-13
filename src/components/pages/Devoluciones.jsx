@@ -1,49 +1,163 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RotateCw, Search, Package, CheckCircle, Clock } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, getDocs, query, where, doc, addDoc, serverTimestamp, orderBy, limit, runTransaction } from "firebase/firestore";
 
 const Returns = () => {
   const [searchInput, setSearchInput] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [showContractResults, setShowContractResults] = useState(false);
-  const [showMaterialsSection, setShowMaterialsSection] = useState(false);
-  const [materials, setMaterials] = useState([]);
+  const [filterStatus, setFilterStatus] = useState(''); // Default to all statuses
+  const [contracts, setContracts] = useState([]);
+  const [selectedContract, setSelectedContract] = useState(null);
+  const [returnsHistory, setReturnsHistory] = useState([]);
 
-  const contractData = {
-    id: 'CIM-2023-042',
-    clientName: 'Constructora Obrera',
-    projectName: 'Torres Reforma',
-    startDate: '15/05/2023',
-    returnDate: '04/06/2023',
-    status: 'Pendiente'
+  useEffect(() => {
+    fetchReturnsHistory();
+  }, []);
+
+  const fetchReturnsHistory = async () => {
+    const returnsCollectionRef = collection(db, "returns");
+    const q = query(returnsCollectionRef, orderBy("returnDate", "desc"), limit(10));
+    const querySnapshot = await getDocs(q);
+    const history = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setReturnsHistory(history);
   };
 
-  const returnsHistory = [
-    {
-      date: '10/05/2023',
-      contractId: 'CIM-2023-035',
-      client: 'Ing. Roberto Martínez',
-      materials: '25 tablas, 10 barrotes',
-      status: 'Completado'
-    }
-  ];
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-MX', { timeZone: 'UTC' });
+  };
 
-  const handleSearch = (e) => {
-    const value = e.target.value;
-    setSearchInput(value);
-    if (value.length > 0) {
-      setShowContractResults(true);
+  const searchContracts = async () => {
+    const contractsRef = collection(db, "contracts");
+    let q;
+
+    if (filterStatus) {
+      q = query(contractsRef, where('status', '==', filterStatus));
     } else {
-      setShowContractResults(false);
+      q = query(contractsRef, orderBy("createdAt", "desc")); // Show all, newest first
+    }
+    
+    const querySnapshot = await getDocs(q);
+    let foundContracts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    if (searchInput.trim()) {
+      const lowercasedInput = searchInput.toLowerCase();
+      foundContracts = foundContracts.filter(c => 
+        c.contractNumber.toLowerCase().includes(lowercasedInput) ||
+        c.clientName.toLowerCase().includes(lowercasedInput) ||
+        c.clientProject.toLowerCase().includes(lowercasedInput)
+      );
+    }
+
+    setContracts(foundContracts);
+    setSelectedContract(null);
+  };
+
+  const handleContractClick = (contract) => {
+    setSelectedContract(contract);
+  };
+
+  const handleRegisterReturn = async () => {
+    if (!selectedContract) return;
+
+    try {
+      // Usar una transacción para asegurar la consistencia de los datos
+      await runTransaction(db, async (transaction) => {
+        // 1. LEER PRIMERO: Obtener referencias a los documentos que se modificarán.
+        const contractRef = doc(db, "contracts", selectedContract.id);
+        const inventoryQuery = query(collection(db, "inventory"), where("contractId", "==", selectedContract.contractNumber));
+        const rentedItemsSnapshot = await getDocs(inventoryQuery); // Esta lectura está bien aquí, ya que es para encontrar los documentos a procesar.
+
+        const sourceDocsToUpdate = [];
+        for (const rentedDoc of rentedItemsSnapshot.docs) {
+          const rentedItem = rentedDoc.data();
+          if (rentedItem.sourceInventoryId) {
+            const sourceInventoryRef = doc(db, "inventory", rentedItem.sourceInventoryId);
+            const sourceDoc = await transaction.get(sourceInventoryRef); // Lectura transaccional
+            if (sourceDoc.exists()) {
+              sourceDocsToUpdate.push({ sourceDoc, rentedItem, rentedDocRef: rentedDoc.ref });
+            }
+          }
+        }
+
+        // 2. ESCRIBIR DESPUÉS: Ahora que todas las lecturas terminaron, realizar las escrituras.
+        transaction.update(contractRef, { status: "Devuelto" });
+
+        for (const { sourceDoc, rentedItem, rentedDocRef } of sourceDocsToUpdate) {
+          const newQuantity = sourceDoc.data().quantity + rentedItem.quantity;
+          transaction.update(sourceDoc.ref, { quantity: newQuantity });
+          transaction.delete(rentedDocRef);
+        }
+      });
+
+      // 3. Crear un registro en la colección 'returns' (fuera de la transacción si es solo para historial)
+      const returnsRef = collection(db, "returns");
+      await addDoc(returnsRef, {
+        contractId: selectedContract.contractNumber,
+        clientName: selectedContract.clientName,
+        returnDate: serverTimestamp(),
+        materials: selectedContract.materials.map(m => `${m.quantity} x ${m.name}`).join(', '),
+      });
+      
+      alert('Devolución registrada exitosamente');
+      setSelectedContract(null);
+      setContracts([]);
+      setSearchInput('');
+      fetchReturnsHistory();
+    } catch (error) {
+      console.error("Error al registrar la devolución: ", error);
+      alert('Hubo un error al registrar la devolución.');
     }
   };
 
-  const handleContractClick = () => {
-    setShowMaterialsSection(true);
-    // Aquí cargarías los materiales del contrato seleccionado
-  };
+  const handleRevertReturn = async () => {
+    if (!selectedContract || selectedContract.status !== 'Devuelto') return;
 
-  const handleRegisterReturn = () => {
-    alert('Devolución registrada exitosamente');
+    try {
+      await runTransaction(db, async (transaction) => {
+        // 1. LEER PRIMERO: Obtener referencias y leer los documentos necesarios.
+        const contractRef = doc(db, "contracts", selectedContract.id);
+        const sourceDocsToUpdate = [];
+
+        for (const material of selectedContract.materials) {
+          const sourceInventoryId = material.inventoryId; // Asumimos que este es el ID del lote original
+          if (sourceInventoryId) {
+            const sourceInventoryRef = doc(db, "inventory", sourceInventoryId);
+            const sourceDoc = await transaction.get(sourceInventoryRef); // Lectura transaccional
+            if (!sourceDoc.exists() || sourceDoc.data().quantity < material.quantity) {
+              throw new Error(`No se puede revertir: el stock original para ${material.name} no existe o no tiene suficiente cantidad.`);
+            }
+            sourceDocsToUpdate.push({ sourceInventoryRef, material });
+          }
+        }
+
+        // 2. ESCRIBIR DESPUÉS: Ahora que todas las lecturas terminaron, realizar las escrituras.
+        transaction.update(contractRef, { status: "Rentado" });
+
+        for (const { sourceInventoryRef, material } of sourceDocsToUpdate) {
+          const sourceDoc = await transaction.get(sourceInventoryRef); // Re-lectura para obtener la cantidad actual en la transacción
+          const newSourceQuantity = sourceDoc.data().quantity - material.quantity;
+          transaction.update(sourceInventoryRef, { quantity: newSourceQuantity });
+
+          const newRentedItemRef = doc(collection(db, "inventory"));
+          transaction.set(newRentedItemRef, {
+                materialType: material.name,
+                quantity: material.quantity,
+                status: "Rentado",
+                contractId: selectedContract.contractNumber,
+                sourceInventoryId: sourceInventoryId,
+                createdAt: serverTimestamp()
+              });
+        }
+      });
+      alert('Devolución revertida exitosamente. El contrato está activo de nuevo.');
+      setSelectedContract(null);
+      searchContracts(); // Refrescar la lista
+    } catch (error) {
+      console.error("Error al revertir la devolución: ", error);
+      alert(`Hubo un error al revertir la devolución: ${error.message}`);
+    }
   };
 
   return (
@@ -64,19 +178,28 @@ const Returns = () => {
               Buscar Contrato o Cliente
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
               <div className="md:col-span-2">
                 <div className="relative">
                   <input
                     type="text"
                     id="searchInput"
                     value={searchInput}
-                    onChange={handleSearch}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     placeholder="Buscar por ID de contrato, nombre de cliente o proyecto..."
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                   <Search className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
                 </div>
+              </div>
+              <div className="md:col-span-1">
+                <button
+                  onClick={searchContracts}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium transition flex items-center justify-center gap-2"
+                >
+                  <Search size={18} />
+                  Buscar
+                </button>
               </div>
               <div>
                 <select
@@ -86,53 +209,46 @@ const Returns = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Todos los estados</option>
-                  <option value="pendiente">Pendiente de devolución</option>
-                  <option value="completo">Devuelto parcialmente</option>
+                  <option value="Rentado">Pendiente (Rentado)</option>
+                  <option value="Devuelto">Devuelto</option>
                 </select>
               </div>
             </div>
 
-            {showContractResults && (
+            {contracts.length > 0 && (
               <div id="contractResults" className="mt-4 space-y-2">
-                <div
-                  onClick={handleContractClick}
-                  className="p-4 border border-gray-200 rounded-md hover:bg-blue-50 cursor-pointer"
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="font-medium">
-                        Contrato: <span className="contract-id">{contractData.id}</span>
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Cliente: <span className="client-name">{contractData.clientName}</span>
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Proyecto: <span className="project-name">{contractData.projectName}</span>
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm">
-                        Fecha inicio: <span className="start-date">{contractData.startDate}</span>
-                      </p>
-                      <p className="text-sm">
-                        Fecha devolución: <span className="return-date">{contractData.returnDate}</span>
-                      </p>
-                      <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                        {contractData.status}
-                      </span>
+                {contracts.map(contract => (
+                  <div
+                    key={contract.id}
+                    onClick={() => handleContractClick(contract)}
+                    className={`p-4 border rounded-md hover:bg-blue-50 cursor-pointer ${selectedContract?.id === contract.id ? 'bg-blue-100 border-blue-400' : 'border-gray-200'}`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-medium">Contrato: {contract.contractNumber}</h3>
+                        <p className="text-sm text-gray-600">Cliente: {contract.clientName}</p>
+                        <p className="text-sm text-gray-600">Proyecto: {contract.clientProject}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm">Fecha inicio: {formatDate(contract.startDate)}</p>
+                        <p className="text-sm">Fecha devolución: {formatDate(contract.returnDate)}</p>
+                        <span className={`px-2 py-1 text-xs rounded-full ${contract.status === 'Rentado' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                          {contract.status}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
             )}
           </section>
 
           {/* Materiales a Devolver */}
-          {showMaterialsSection && (
+          {selectedContract && (
             <section id="materialsSection" className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <Package className="text-blue-600" />
-                Materiales a Devolver
+                Materiales a Devolver del Contrato {selectedContract.contractNumber}
               </h2>
               
               <div className="overflow-x-auto">
@@ -143,10 +259,7 @@ const Returns = () => {
                         Material
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cantidad Rentada
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cantidad a Devolver
+                        Cantidad
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Estado
@@ -154,43 +267,43 @@ const Returns = () => {
                     </tr>
                   </thead>
                   <tbody id="materialsBody" className="bg-white divide-y divide-gray-200">
-                    {materials.length === 0 ? (
-                      <tr>
-                        <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
-                          No hay materiales para mostrar
+                    {selectedContract.materials.map((material, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {material.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {material.quantity}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Rentado</span>
                         </td>
                       </tr>
-                    ) : (
-                      materials.map((material, index) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {material.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {material.rented}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {material.toReturn}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {material.status}
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
 
               <div className="mt-6 flex justify-end">
-                <button
-                  id="registerReturnBtn"
-                  onClick={handleRegisterReturn}
-                  className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-md font-medium transition duration-150 ease-in-out flex items-center gap-2"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Registrar Devolución
-                </button>
+                {selectedContract.status === 'Rentado' && (
+                  <button
+                    id="registerReturnBtn"
+                    onClick={handleRegisterReturn}
+                    className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-md font-medium transition duration-150 ease-in-out flex items-center gap-2"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Registrar Devolución
+                  </button>
+                )}
+                {selectedContract.status === 'Devuelto' && (
+                  <button
+                    onClick={handleRevertReturn}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-6 rounded-md font-medium transition duration-150 ease-in-out flex items-center gap-2"
+                  >
+                    <RotateCw className="w-5 h-5" />
+                    Revertir Devolución
+                  </button>
+                )}
               </div>
             </section>
           )}
@@ -225,22 +338,22 @@ const Returns = () => {
                 </thead>
                 <tbody id="returnsHistoryBody" className="bg-white divide-y divide-gray-200">
                   {returnsHistory.map((item, index) => (
-                    <tr key={index}>
+                    <tr key={item.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.date}
+                        {item.returnDate?.toDate().toLocaleDateString('es-MX') || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.contractId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.client}
+                        {item.clientName}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.materials}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {item.status}
+                          Completado
                         </span>
                       </td>
                     </tr>
@@ -251,8 +364,6 @@ const Returns = () => {
           </section>
         </div>
       </main>
-
-      {/* Footer component would go here */}
     </div>
   );
 };

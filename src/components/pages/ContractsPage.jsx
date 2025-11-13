@@ -1,20 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, ChevronDown, Eye, Printer, Download, X } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, getDocs, addDoc, serverTimestamp, query, where, writeBatch, doc, runTransaction } from "firebase/firestore";
 
 const ContractsRental = () => {
   const [selectedClient, setSelectedClient] = useState('');
   const [startDate, setStartDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
-  const [materials, setMaterials] = useState([
-    { id: 1, name: 'Tabla de cimbra', checked: false, quantity: 1, price: 17, type: 'tabla' },
-    { id: 2, name: 'Barrote completo', checked: false, quantity: 1, price: 17, type: 'barrote' },
-    { id: 3, name: 'Pedazo de barrote', checked: false, quantity: 1, price: 17, type: 'pedazo' }
-  ]);
+  const [materials, setMaterials] = useState([]);
+  const [clients, setClients] = useState([]);
 
-  const clients = [
-    { id: 'CLI-1001', name: 'Constructora Obrera SA de CV', phone: '744-123-4567', project: 'Proyecto Centro' },
-    { id: 'CLI-1002', name: 'Ing. Roberto Martínez', phone: '744-987-6543', project: 'Obra Residencial' }
-  ];
+  useEffect(() => {
+    const fetchClientsAndMaterials = async () => {
+      // Fetch clients
+      const clientsCollectionRef = collection(db, "clients");
+      const clientsSnapshot = await getDocs(clientsCollectionRef);
+      setClients(clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      // Fetch available materials from inventory
+      const inventoryCollectionRef = collection(db, "inventory");
+      const q = query(inventoryCollectionRef, where("status", "==", "Disponible"));
+      const materialsSnapshot = await getDocs(q);
+      const availableMaterials = materialsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.materialType,
+          checked: false,
+          quantity: 1,
+          price: 17, // Default price, can be adjusted
+          available: data.quantity,
+        };
+      });
+      setMaterials(availableMaterials);
+    };
+
+    fetchClientsAndMaterials();
+  }, []);
 
   useEffect(() => {
     if (startDate) {
@@ -51,13 +73,72 @@ const ContractsRental = () => {
     ));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedClient || !startDate || !materials.some(m => m.checked)) {
+    const selectedMaterials = materials.filter(m => m.checked);
+    if (!selectedClient || !startDate || selectedMaterials.length === 0) {
       alert('Por favor complete todos los campos requeridos y seleccione al menos un material');
       return;
     }
-    alert('Contrato generado exitosamente');
+
+    // Validar que hay suficiente stock para cada material seleccionado
+    for (const material of selectedMaterials) {
+      if (material.quantity > material.available) {
+        alert(`No hay suficiente stock para "${material.name}". Disponible: ${material.available}, Solicitado: ${material.quantity}.`);
+        return;
+      }
+    }
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // 1. LEER PRIMERO: Realizar todas las lecturas necesarias al inicio.
+        const contractsCollectionRef = collection(db, "contracts");
+        const snapshot = await getDocs(contractsCollectionRef); // Lectura no transaccional para el contador.
+        const newContractNumber = `CIM-${new Date().getFullYear()}-${String(snapshot.size + 1).padStart(3, '0')}`;
+        
+        const inventoryDocs = [];
+        for (const material of selectedMaterials) {
+            const sourceInventoryRef = doc(db, "inventory", material.id);
+            const sourceDoc = await transaction.get(sourceInventoryRef); // Lectura transaccional
+            if (!sourceDoc.exists() || sourceDoc.data().quantity < material.quantity) {
+              throw `No hay suficiente stock para ${material.name}.`;
+            }
+            inventoryDocs.push({ sourceInventoryRef, sourceDoc, material });
+        }
+
+        // 2. ESCRIBIR DESPUÉS: Ahora que todas las lecturas se completaron, realizar las escrituras.
+        
+        // Guardar el nuevo contrato
+        const clientData = getSelectedClient();
+        const newContractRef = doc(collection(db, "contracts"));
+        transaction.set(newContractRef, {
+          contractNumber: newContractNumber,
+          clientId: selectedClient,
+          clientName: clientData.name, clientPhone: clientData.phone, clientProject: clientData.project,
+          startDate,
+          returnDate,
+          materials: selectedMaterials.map(({ id, name, quantity, price }) => ({ inventoryId: id, name, quantity, price })),
+          totalCost: estimatedCost,
+          status: 'Rentado', createdAt: serverTimestamp(),
+        });
+
+        // Actualizar el inventario
+        for (const { sourceInventoryRef, sourceDoc, material } of inventoryDocs) {
+            const newSourceQuantity = sourceDoc.data().quantity - material.quantity;
+            transaction.update(sourceInventoryRef, { quantity: newSourceQuantity });
+
+            const newRentedItemRef = doc(collection(db, "inventory"));
+            transaction.set(newRentedItemRef, { materialType: material.name, quantity: material.quantity, status: "Rentado", registerDate: new Date().toISOString().split('T')[0], materialId: `CIM-${Math.floor(Math.random() * 10000)}`, contractId: newContractNumber, sourceInventoryId: material.id, createdAt: serverTimestamp() });
+        }
+      });
+
+      alert('Contrato generado y guardado exitosamente');
+      handleCancel();
+
+    } catch (error) {
+      console.error("Error al generar el contrato: ", error);
+      alert(`Hubo un error al generar el contrato: ${error}`);
+    }
   };
 
   const handleCancel = () => {
@@ -91,8 +172,7 @@ const ContractsRental = () => {
 
   const estimatedCost = calculateEstimatedCost();
   const client = getSelectedClient();
-  const today = new Date().toLocaleDateString('es-MX');
-  const contractNumber = 'CIM-2023-001';
+  const contractNumber = 'CIM-XXXX-XXX'; // Placeholder for preview
 
   return (
     <div className="w-full">
@@ -226,7 +306,7 @@ const ContractsRental = () => {
                   </div>
                 </div>
 
-                {/* Botones */}
+                {/* Botones de Acción */}
                 <div className="flex gap-3 pt-4">
                   <button
                     type="submit"
@@ -285,7 +365,7 @@ const ContractsRental = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Fecha:</p>
-                    <p className="font-medium">{today}</p>
+                    <p className="font-medium">{new Date().toLocaleDateString('es-MX')}</p>
                   </div>
                 </div>
 
