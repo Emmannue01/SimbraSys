@@ -1,100 +1,134 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart2, Download } from 'lucide-react';
 import { Chart, registerables } from 'chart.js/auto';
+import { db } from '../firebase';
+import { collection, getDocs, query, where } from "firebase/firestore";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 Chart.register(...registerables);
 export default function ReportsIncome() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [totalIncome, setTotalIncome] = useState(24820.00);
-  const [activeContracts, setActiveContracts] = useState(8);
-  const [rentedMaterials, setRentedMaterials] = useState(215);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [activeContracts, setActiveContracts] = useState(0);
+  const [rentedMaterials, setRentedMaterials] = useState(0);
   const [rentals, setRentals] = useState([]);
+  const [allRentals, setAllRentals] = useState([]);
   const [chartInstance, setChartInstance] = useState(null);
 
   useEffect(() => {
-    // Inicializar gráfica
-    let chart;
+    fetchContracts();
+  }, []);
+
+  useEffect(() => {
+    if (allRentals.length > 0) {
+      updateDashboard(rentals.length > 0 ? rentals : allRentals);
+    }
+  }, [rentals, allRentals]);
+
+  const fetchContracts = async () => {
+    const contractsCollectionRef = collection(db, "contracts");
+    const q = query(contractsCollectionRef);
+    const querySnapshot = await getDocs(q);
+    const contractsData = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      // Asegurarse que los campos de fecha son consistentes
+      startDate: doc.data().startDate,
+      returnDate: doc.data().returnDate,
+      amount: doc.data().totalCost,
+      client: doc.data().clientName,
+      status: doc.data().status,
+    }));
+    setAllRentals(contractsData);
+    setRentals(contractsData);
+  };
+
+  const updateDashboard = (data) => {
+    // Calcular estadísticas
+    const total = data.reduce((sum, rental) => sum + rental.amount, 0);
+    const active = data.filter(rental => rental.status === 'Rentado').length;
+    const materials = data.reduce((sum, rental) => {
+      if (rental.status === 'Rentado') {
+        return sum + rental.materials.reduce((matSum, mat) => matSum + mat.quantity, 0);
+      }
+      return sum;
+    }, 0);
+
+    setTotalIncome(total);
+    setActiveContracts(active);
+    setRentedMaterials(materials);
+
+    // Actualizar gráfica
+    const monthlyIncome = {};
+    const monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    
+    data.forEach(rental => {
+      const date = new Date(rental.startDate);
+      const month = date.getMonth();
+      if (monthlyIncome[month]) {
+        monthlyIncome[month] += rental.amount;
+      } else {
+        monthlyIncome[month] = rental.amount;
+      }
+    });
+
+    const chartData = Array(12).fill(0);
+    for (const month in monthlyIncome) {
+      chartData[month] = monthlyIncome[month];
+    }
+
     const ctx = document.getElementById('incomeChart');
     if (ctx) {
-      // Destruir cualquier instancia de gráfico existente en este canvas
-      const existingChart = Chart.getChart(ctx);
-      if (existingChart) {
-        existingChart.destroy();
+      if (chartInstance) {
+        chartInstance.destroy();
       }
-      chart = new Chart(ctx, {
+      const newChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+          labels: monthLabels,
           datasets: [{
             label: 'Ingresos',
-            data: [3500, 4200, 3800, 5100, 4600, 5200],
+            data: chartData,
             borderColor: 'rgb(37, 99, 235)',
             backgroundColor: 'rgba(37, 99, 235, 0.1)',
             tension: 0.4
           }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: true,
-              position: 'top'
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: function(value) {
-                  return '$' + value.toLocaleString();
-                }
-              }
-            }
+        options: chartOptions
+      });
+      setChartInstance(newChart);
+    }
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: function(value) {
+            return '$' + value.toLocaleString('es-MX', { minimumFractionDigits: 2 });
           }
         }
-      });
-    }
-
-    // Cargar datos de ejemplo
-    loadSampleRentals();
-
-    return () => {
-      // Limpieza al desmontar el componente
-      chart?.destroy();
-    };
-  }, []);
-
-  const loadSampleRentals = () => {
-    const sampleData = [
-      {
-        id: 'C-001',
-        client: 'Constructora ABC',
-        startDate: '2024-10-15',
-        returnDate: '2024-11-15',
-        amount: 5600.00,
-        status: 'Activo'
-      },
-      {
-        id: 'C-002',
-        client: 'Obras del Norte',
-        startDate: '2024-10-20',
-        returnDate: '2024-11-20',
-        amount: 3200.00,
-        status: 'Activo'
-      },
-      {
-        id: 'C-003',
-        client: 'Desarrollo Urbano SA',
-        startDate: '2024-09-01',
-        returnDate: '2024-10-01',
-        amount: 8500.00,
-        status: 'Finalizado'
       }
-    ];
-    setRentals(sampleData);
+    }
   };
+
+  useEffect(() => {
+    return () => {
+      chartInstance?.destroy();
+    };
+  }, [chartInstance]);
 
   const handlePeriodFilter = (days) => {
     const end = new Date();
@@ -106,22 +140,55 @@ export default function ReportsIncome() {
   };
 
   const handleFilter = () => {
-    // Implementar lógica de filtrado
-    console.log('Filtrando desde', startDate, 'hasta', endDate);
+    if (!startDate || !endDate) {
+      setRentals(allRentals);
+      return;
+    }
+    const filtered = allRentals.filter(rental => {
+      const rentalDate = new Date(rental.startDate);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      return rentalDate >= start && rentalDate <= end;
+    });
+    setRentals(filtered);
   };
 
   const handleExportPDF = () => {
-    console.log('Exportando PDF...');
+    const doc = new jsPDF();
+    doc.text("Reporte de Rentas", 14, 16);
+    doc.autoTable({
+      head: [['Contrato', 'Cliente', 'Fecha Inicio', 'Fecha Devolución', 'Monto Total', 'Estado']],
+      body: rentals.map(r => [
+        r.id,
+        r.client,
+        r.startDate,
+        r.returnDate,
+        `$${r.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+        r.status
+      ]),
+      startY: 20,
+    });
+    doc.save('reporte_rentas.pdf');
   };
 
   const handleExportExcel = () => {
-    console.log('Exportando Excel...');
+    const worksheet = XLSX.utils.json_to_sheet(rentals.map(r => ({
+      'Contrato': r.id,
+      'Cliente': r.client,
+      'Fecha Inicio': r.startDate,
+      'Fecha Devolución': r.returnDate,
+      'Monto Total': r.amount,
+      'Estado': r.status
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Rentas");
+    XLSX.writeFile(workbook, "reporte_rentas.xlsx");
   };
 
   const getStatusColor = (status) => {
-    return status === 'Activo' 
-      ? 'bg-green-100 text-green-800' 
-      : 'bg-gray-100 text-gray-800';
+    return status === 'Rentado' 
+      ? 'bg-yellow-100 text-yellow-800' 
+      : 'bg-green-100 text-green-800';
   };
 
   return (
@@ -274,7 +341,7 @@ export default function ReportsIncome() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-200" id="rentals-table-body">
                 {rentals.map((rental) => (
                   <tr key={rental.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
