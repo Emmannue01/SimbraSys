@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './components/firebase';
 
@@ -20,7 +20,7 @@ function App() {
   if (loading) return <div>Cargando...</div>
 //sss
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginForm />} />
         <Route path="/registro" element={user ? <Navigate to="/dashboard" /> : <RegisterForm />} />
@@ -38,7 +38,7 @@ function App() {
 
         <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
