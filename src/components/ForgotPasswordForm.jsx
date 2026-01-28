@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Package } from 'lucide-react';
+import { Mail, ShoppingBag } from 'lucide-react';
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from './firebase.jsx';
 import { Link } from 'react-router-dom';
@@ -42,7 +42,7 @@ export default function ForgotPasswordForm() {
       <div className="w-full max-w-md mx-auto p-8 bg-white rounded-xl shadow-lg">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Package className="h-16 w-16 text-amber-800" strokeWidth={2} />
+            <ShoppingBag className="h-16 w-16 text-indigo-800" strokeWidth={2} />
           </div>
           <h1 className="text-3xl font-bold text-gray-800">Recuperar Contraseña</h1>
           <p className="text-gray-600 mt-2">Ingresa tu correo para recibir un enlace de restablecimiento.</p>
@@ -57,7 +57,7 @@ export default function ForgotPasswordForm() {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Mail className="text-black" size={20} />
               </div>
-              <input id="email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none" placeholder="tu@correo.com" />
+              <input id="email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="tu@correo.com" />
             </div>
           </div>
 
@@ -65,7 +65,7 @@ export default function ForgotPasswordForm() {
           {success && <div className="text-green-600 text-sm text-center">{success}</div>}
 
           <div>
-            <button type="submit" disabled={isLoading || success} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition duration-150 disabled:bg-amber-400 disabled:cursor-not-allowed">
+            <button type="submit" disabled={isLoading || success} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 disabled:bg-indigo-400 disabled:cursor-not-allowed">
               {isLoading ? 'Enviando...' : 'Enviar correo'}
             </button>
           </div>
@@ -73,7 +73,7 @@ export default function ForgotPasswordForm() {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            <Link to="/login" className="font-medium text-amber-600 hover:text-amber-500">
+            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
               Volver a Iniciar sesión
             </Link>
           </p>

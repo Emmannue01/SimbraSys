@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Lock, Package } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, Lock, ShoppingBag } from 'lucide-react';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { auth, db } from './firebase.jsx'; 
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from './firebase.jsx';
+import { doc, getDoc } from "firebase/firestore";
 import { useNavigate, Link } from 'react-router-dom';
 
-export default function LoginForm() {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -18,26 +18,20 @@ export default function LoginForm() {
     setIsLoading(true);
     setError(null);
 
-
-    console.log('Intentando iniciar sesión con:', { email, password });
-
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      console.log('Autenticación exitosa, verificando autorización...', user.email);
 
-      // Paso 2: Verificar si el usuario está en la colección 'autenticados'
+      // Verificación de autorización (Basado en SimbraSys)
+      // NOTA: Si Trend Caps es una tienda pública, podrías querer eliminar esta verificación
+      // para permitir que cualquier usuario registrado entre.
       const docRef = doc(db, "autenticados", user.email);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        // El usuario está autorizado
-        console.log('Usuario autorizado. Redirigiendo...');
         navigate('/dashboard');
       } else {
-        // El usuario no está en 'autenticados'. No está autorizado.
-        console.log('Usuario no autorizado:', user.email);
-        await signOut(auth); // Cerrar la sesión del usuario no autorizado
+        await signOut(auth);
         setError('No tienes permiso para acceder. Contacta a un administrador.');
       }
     } catch (err) {
@@ -54,7 +48,7 @@ export default function LoginForm() {
           setError('El formato del correo electrónico no es válido.');
           break;
         default:
-          setError('Hubo un problema al iniciar sesión. Revisa la consola para más detalles.');
+          setError('Hubo un problema al iniciar sesión.');
           break;
       }
     } finally {
@@ -70,24 +64,19 @@ export default function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      console.log('Autenticación con Google exitosa, verificando autorización...', user.email);
 
-      // Paso 2: Verificar si el usuario está en la colección 'autenticados'
       const docRef = doc(db, "autenticados", user.email);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        console.log('Usuario de Google autorizado. Redirigiendo...');
         navigate('/dashboard');
       } else {
-        // El usuario no está en 'autenticados'. No está autorizado.
-        console.log('Usuario de Google no autorizado:', user.email);
-        await signOut(auth); // Cerrar la sesión del usuario no autorizado
+        await signOut(auth);
         setError('No tienes permiso para acceder. Contacta a un administrador.');
       }
     } catch (error) {
       console.error("Error en inicio de sesión con Google:", error);
-      setError("No se pudo iniciar sesión con Google. Inténtalo de nuevo.");
+      setError("No se pudo iniciar sesión con Google.");
     } finally {
       setIsLoading(false);
     }
@@ -98,10 +87,10 @@ export default function LoginForm() {
       <div className="w-full max-w-md mx-auto p-8 bg-white rounded-xl shadow-lg">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Package className="h-16 w-16 text-amber-800" strokeWidth={2} />
+            <ShoppingBag className="h-16 w-16 text-indigo-800" strokeWidth={2} />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800">CIMBRA-SYS</h1>
-          <p className="text-gray-600 mt-2">Sistema de renta de madera para cimbra</p>
+          <h1 className="text-3xl font-bold text-gray-800">TREND-CAPS</h1>
+          <p className="text-gray-600 mt-2">Estilo y calidad en cada gorra</p>
         </div>
 
         <form className="space-y-6" onSubmit={handleSubmit}>
@@ -121,7 +110,7 @@ export default function LoginForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 placeholder="tu@correo.com"
               />
             </div>
@@ -143,7 +132,7 @@ export default function LoginForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 placeholder="••••••••"
               />
             </div>
@@ -157,7 +146,7 @@ export default function LoginForm() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
                 Recordarme
@@ -165,23 +154,19 @@ export default function LoginForm() {
             </div>
 
             <div className="text-sm">
-              <Link to="/recuperar-contrasena" className="font-medium text-amber-600 hover:text-amber-500">
+              <Link to="/recuperar-contrasena" className="font-medium text-indigo-600 hover:text-indigo-500">
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>
           </div>
 
-          {error && (
-            <div className="text-red-600 text-sm text-center">
-              {error}
-            </div>
-          )}
+          {error && <div className="text-red-600 text-sm text-center">{error}</div>}
 
           <div>
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition duration-150 disabled:bg-amber-400 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 disabled:bg-indigo-400 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </button>
@@ -204,7 +189,7 @@ export default function LoginForm() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={isLoading}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition duration-150"
+                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150"
               >
                 <div className="flex items-center">
                   <img
@@ -222,7 +207,7 @@ export default function LoginForm() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             ¿No tienes una cuenta?{' '}
-            <Link to="/registro" className="font-medium text-amber-600 hover:text-amber-500">
+            <Link to="/registro" className="font-medium text-indigo-600 hover:text-indigo-500">
               Regístrate
             </Link>
           </p>

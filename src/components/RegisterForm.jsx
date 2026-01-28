@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Package } from 'lucide-react';
+import { Mail, Lock, ShoppingBag } from 'lucide-react';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from './firebase.jsx';
 import { Link } from 'react-router-dom';
@@ -53,10 +53,10 @@ export default function RegisterForm() {
       <div className="w-full max-w-md mx-auto p-8 bg-white rounded-xl shadow-lg">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Package className="h-16 w-16 text-amber-800" strokeWidth={2} />
+            <ShoppingBag className="h-16 w-16 text-indigo-800" strokeWidth={2} />
           </div>
           <h1 className="text-3xl font-bold text-gray-800">Crear Cuenta</h1>
-          <p className="text-gray-600 mt-2">CIMBRA-SYS</p>
+          <p className="text-gray-600 mt-2">TREND-CAPS</p>
         </div>
 
         <form className="space-y-6" onSubmit={handleSubmit}>
@@ -76,7 +76,7 @@ export default function RegisterForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 placeholder="tu@correo.com"
               />
             </div>
@@ -97,7 +97,7 @@ export default function RegisterForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 placeholder="Mínimo 6 caracteres"
               />
             </div>
@@ -118,7 +118,7 @@ export default function RegisterForm() {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                className="text-black w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 placeholder="Repite la contraseña"
               />
             </div>
@@ -128,7 +128,7 @@ export default function RegisterForm() {
           {success && <div className="text-green-600 text-sm text-center">{success}</div>}
 
           <div>
-            <button type="submit" disabled={isLoading || success} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition duration-150 disabled:bg-amber-400 disabled:cursor-not-allowed">
+            <button type="submit" disabled={isLoading || success} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 disabled:bg-indigo-400 disabled:cursor-not-allowed">
               {isLoading ? 'Registrando...' : 'Crear cuenta'}
             </button>
           </div>
@@ -137,7 +137,7 @@ export default function RegisterForm() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             ¿Ya tienes una cuenta?{' '}
-            <Link to="/login" className="font-medium text-amber-600 hover:text-amber-500">
+            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
               Inicia sesión
             </Link>
           </p>
